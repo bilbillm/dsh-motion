@@ -1,0 +1,97 @@
+{
+  "name": "@dsh-external/dsh-motion",
+  "version": "0.1.0",
+  "description": "A semantic, theme-compatible motion runtime for DeepSeek Harness.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/index.js.map",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./lib/client.js"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/bilbillm/dsh-motion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bilbillm/dsh-motion/issues"
+  },
+  "homepage": "https://github.com/bilbillm/dsh-motion#readme",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "motion",
+    "accessibility"
+  ],
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "types": "tsc -p tsconfig.build.json",
+    "bundle": "tsdown",
+    "build": "pnpm run bundle && pnpm run types",
+    "prepare": "pnpm run build",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:watch": "vitest",
+    "check": "pnpm run typecheck && pnpm run build && pnpm run test",
+    "pack:check": "pnpm pack --dry-run"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1 <5",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.5 <0.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@types/jsdom": "^28.0.0",
+    "@types/node": "^22.20.0",
+    "jsdom": "^29.1.1",
+    "playwright": "1.61.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10",
+    "yaml": "^2.8.1"
+  }
+}

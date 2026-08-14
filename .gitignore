@@ -1,0 +1,7 @@
+node_modules/
+lib/
+coverage/
+.vitest/
+*.tsbuildinfo
+.scratch/package/
+work/
