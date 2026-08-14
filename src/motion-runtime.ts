@@ -274,11 +274,18 @@ export class MotionRuntime {
   }
 
   private startAnimation(element: HTMLElement, kind: MotionKind, timing: MotionTiming): MotionAnimation | undefined {
-    return this.startKeyframeAnimation(
+    this.cancelElementAnimations(element)
+    const restoreBackdrop = kind === 'dialog'
+      ? suspendBackdropFilter(element, this.document)
+      : undefined
+    const animation = this.startKeyframeAnimation(
       element,
       keyframesFor(kind, timing, supportsIndependentTransforms(this.document)),
       timing,
+      restoreBackdrop,
     )
+    if (animation === undefined) restoreBackdrop?.()
+    return animation
   }
 
   private startKeyframeAnimation(
@@ -783,9 +790,62 @@ function prepareGhost(root: HTMLElement, detailMarker: string): void {
     element.removeAttribute('aria-labelledby')
     element.removeAttribute('aria-describedby')
     element.setAttribute('tabindex', '-1')
+    element.style.pointerEvents = 'none'
+    element.style.setProperty('backdrop-filter', 'none', 'important')
+    element.style.setProperty('-webkit-backdrop-filter', 'none', 'important')
     element.style.animation = 'none'
     element.style.transition = 'none'
   }
+}
+
+function suspendBackdropFilter(
+  element: HTMLElement,
+  documentValue: Document | undefined,
+): (() => void) | undefined {
+  let computed: CSSStyleDeclaration | undefined
+  try {
+    computed = documentValue?.defaultView?.getComputedStyle(element)
+  } catch {
+    return undefined
+  }
+  const standard = computed?.getPropertyValue('backdrop-filter').trim() ?? ''
+  const webkit = computed?.getPropertyValue('-webkit-backdrop-filter').trim() ?? ''
+  if ((standard === '' || standard === 'none') && (webkit === '' || webkit === 'none')) {
+    return undefined
+  }
+
+  const previous = [
+    captureDeclaration(element.style, 'backdrop-filter'),
+    captureDeclaration(element.style, '-webkit-backdrop-filter'),
+  ] as const
+  element.style.setProperty('backdrop-filter', 'none', 'important')
+  element.style.setProperty('-webkit-backdrop-filter', 'none', 'important')
+  return () => {
+    restoreDeclaration(element.style, previous[0])
+    restoreDeclaration(element.style, previous[1])
+  }
+}
+
+interface StyleDeclarationSnapshot {
+  readonly property: string
+  readonly value: string
+  readonly priority: string
+}
+
+function captureDeclaration(style: CSSStyleDeclaration, property: string): StyleDeclarationSnapshot {
+  return {
+    property,
+    value: style.getPropertyValue(property),
+    priority: style.getPropertyPriority(property),
+  }
+}
+
+function restoreDeclaration(style: CSSStyleDeclaration, snapshot: StyleDeclarationSnapshot): void {
+  if (snapshot.value === '') {
+    style.removeProperty(snapshot.property)
+    return
+  }
+  style.setProperty(snapshot.property, snapshot.value, snapshot.priority)
 }
 
 function defaultRoot(): Document | undefined {

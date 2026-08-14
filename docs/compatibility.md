@@ -21,6 +21,8 @@ The assertions include:
 - directional through-fades for model/reasoning menu-page replacement without
   retriggering command-list filtering;
 - workspace tree-group height motion and fading removed-row ghosts;
+- dialog-owned entry batching and temporary backdrop-filter suspension for
+  large glass surfaces, including exact style restoration;
 - host WAAPI/CSS animation precedence and `data-dsh-motion="off"`;
 - live reduced-motion changes and cancellation;
 - focus, ARIA, scroll, and layout invariants;
@@ -57,6 +59,12 @@ settlement. Workspace groups interpolated between measured heights and removed
 rows faded without changing the selected tree item. Angelina parallax layers
 remained present while ordinary UI motion stayed enabled; only
 `data-dsh-angelina-layer` subtrees are excluded.
+
+An Angelina Light regression probe with Chromium CPU throttled 4x reduced the
+settings-dialog average worst frame gap from about 72ms to 50ms on entry and
+from about 67ms to 17ms on exit. The entry batch now emits only dialog and mask
+motion instead of seven overlapping animations. These figures document the
+local comparison rather than define a portable CI timing threshold.
 
 ## Current Host Gaps
 

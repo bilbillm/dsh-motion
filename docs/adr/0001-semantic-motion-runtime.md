@@ -23,6 +23,11 @@ Every clone is `aria-hidden`, inert, pointer-disabled, stripped of identifiers
 and ARIA references, and removed after its owned animations settle. Drill-in
 pages that replace the children of one semantic menu use the same mechanism for
 a directional through-fade. Listbox filtering does not count as a page change.
+When a dialog and its contents mount in one observer batch, the dialog owns the
+visual entry while nested state controls retain only their state-transition
+markers. A backdrop-filtered dialog temporarily freezes backdrop sampling for
+the transition and restores the exact declaration on settlement; exit ghosts
+never sample the backdrop and disable pointer targeting across their full tree.
 
 Workspace disclosure is the only layout animation. The runtime finds the tree
 group through the nearest `role="tree"` boundary, animates the group height, and

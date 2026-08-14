@@ -11,12 +11,15 @@ interface AnimationCall {
   readonly animation: MotionAnimation
 }
 
-function runtimeFixture(policy?: MotionPolicy) {
+function runtimeFixture(
+  policy?: MotionPolicy,
+  animationFactory: () => MotionAnimation = () => ({ cancel: vi.fn() }),
+) {
   let nextFrame = 0
   const frames = new Map<number, () => void>()
   const calls: AnimationCall[] = []
   const animator: MotionAnimator = (element, keyframes, options) => {
-    const animation: MotionAnimation = { cancel: vi.fn() }
+    const animation = animationFactory()
     calls.push({ element, keyframes, options, animation })
     return animation
   }
@@ -68,7 +71,7 @@ describe('MotionRuntime', () => {
     const menu = document.createElement('div')
     menu.id = 'menu-id'
     menu.setAttribute('role', 'menu')
-    menu.innerHTML = '<button id="action">Run</button>'
+    menu.innerHTML = '<button id="action" style="pointer-events: auto; backdrop-filter: blur(4px)">Run</button>'
     document.body.appendChild(menu)
     await mutationTurn()
     runtime.flushNow()
@@ -82,11 +85,33 @@ describe('MotionRuntime', () => {
     expect(ghost?.getAttribute('aria-hidden')).toBe('true')
     expect(ghost?.hasAttribute('inert')).toBe(true)
     expect(ghost?.querySelector('[id]')).toBeNull()
+    expect(ghost?.querySelector<HTMLElement>('button')?.style.pointerEvents).toBe('none')
+    expect(ghost?.querySelector<HTMLElement>('button')?.style.getPropertyValue('backdrop-filter')).toBe('none')
     expect(calls).toHaveLength(2)
     expect(calls[1]?.keyframes).toMatchObject([{ opacity: 1 }, { opacity: 0 }])
 
     runtime.dispose()
     expect(document.querySelector('[data-dsh-motion-ghost]')).toBeNull()
+  })
+
+  it('freezes a glass dialog backdrop only while its entry animation is active', async () => {
+    let finish: (() => void) | undefined
+    const finished = new Promise<void>((resolve) => { finish = resolve })
+    const { runtime, calls } = runtimeFixture(undefined, () => ({ cancel: vi.fn(), finished }))
+    const dialog = document.createElement('section')
+    dialog.setAttribute('role', 'dialog')
+    dialog.style.setProperty('backdrop-filter', 'blur(12px) saturate(1.18)')
+    document.body.appendChild(dialog)
+    await mutationTurn()
+    runtime.flushNow()
+
+    expect(calls).toHaveLength(1)
+    expect(dialog.style.getPropertyValue('backdrop-filter')).toBe('none')
+    finish?.()
+    await finished
+    await Promise.resolve()
+    expect(dialog.style.getPropertyValue('backdrop-filter')).toBe('blur(12px) saturate(1.18)')
+    runtime.dispose()
   })
 
   it('animates model, permission, and command surfaces inside composer ownership', async () => {

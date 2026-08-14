@@ -60,6 +60,14 @@ const HARD_EXCLUSION = [
 
 const COMPOSER_OWNERSHIP = '[data-composer-seat], [data-composer-card]'
 
+const DIALOG_OWNED_ENTRY_KINDS = new Set<MotionKind>([
+  'menu',
+  'listbox',
+  'tabpanel',
+  'page',
+  'slot',
+])
+
 /** Maps DOM mutations to a small set of stable surface intents. */
 export class SurfaceClassifier {
   /** Whether direct child replacement represents a drill-in page inside one menu card. */
@@ -82,7 +90,12 @@ export class SurfaceClassifier {
         this.collectMount(element, intents, seen)
       }
     }
-    return intents
+    const dialogs = intents
+      .filter(intent => intent.kind === 'dialog')
+      .map(intent => intent.element)
+    if (dialogs.length === 0) return intents
+    return intents.filter(intent => !DIALOG_OWNED_ENTRY_KINDS.has(intent.kind)
+      || !dialogs.some(dialog => dialog !== intent.element && dialog.contains(intent.element)))
   }
 
   /** Classify one observer record. */

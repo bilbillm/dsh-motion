@@ -11,6 +11,10 @@ interface CapturedMotion {
   readonly role: string | null
   readonly ghost: boolean
   readonly menuPageGhost: boolean
+  readonly nestedInDialog: boolean
+  readonly backdropFilter: string
+  readonly pointerEvents: string
+  readonly ghostPointerSafe: boolean
   readonly keyframes: Array<Record<string, unknown>>
   readonly duration: number | null
 }
@@ -39,6 +43,8 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
       window.__DSH_MOTION_CALLS__ = []
       const animate = Element.prototype.animate
       Element.prototype.animate = function motionProbe(keyframes, options) {
+        const ghostRoot = this.closest('[data-dsh-motion-ghost]')
+        const owningDialog = this.closest('[role="dialog"]')
         const frames = Array.isArray(keyframes)
           ? keyframes.map(frame => ({ ...frame }))
           : keyframes === null ? [] : [{ ...keyframes }]
@@ -47,8 +53,14 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
           : typeof options?.duration === 'number' ? options.duration : null
         window.__DSH_MOTION_CALLS__?.push({
           role: this.getAttribute('role'),
-          ghost: this.hasAttribute('data-dsh-motion-ghost'),
+          ghost: ghostRoot !== null,
           menuPageGhost: this.hasAttribute('data-dsh-motion-menu-page-ghost'),
+          nestedInDialog: owningDialog !== null && owningDialog !== this,
+          backdropFilter: (this as HTMLElement).style.getPropertyValue('backdrop-filter'),
+          pointerEvents: (this as HTMLElement).style.pointerEvents,
+          ghostPointerSafe: ghostRoot === null
+            || [ghostRoot, ...ghostRoot.querySelectorAll('*')]
+              .every(element => (element as HTMLElement).style.pointerEvents === 'none'),
           keyframes: frames,
           duration,
         })
@@ -180,6 +192,24 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
         })
       }
     }
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const exitGhost = page.locator('[data-dsh-motion-ghost]').first()
+    const exitAttached = exitGhost.waitFor({ state: 'attached' })
+    await dialog.getByRole('button', { name: /^(关闭|Close)$/ }).click()
+    await exitAttached
+    await exitGhost.waitFor({ state: 'detached' })
+
+    await clearCapturedMotion(page)
+    await page.getByRole('button', { name: /^(设置|Settings)$/ }).click()
+    await dialog.waitFor({ state: 'visible' })
+    await expect.poll(async () => (
+      await capturedMotion(page)
+    ).some(call => call.role === 'dialog' && !call.ghost)).toBe(true)
+    const settingsEntry = await capturedMotion(page)
+    expect(settingsEntry.some(call => call.role === 'dialog'
+      && !call.ghost && call.backdropFilter === 'none')).toBe(true)
+    expect(settingsEntry.filter(call => call.nestedInDialog)).toEqual([])
   })
 
   it('keeps tabs and tabpanels accessible while applying state transitions', async () => {
@@ -201,6 +231,11 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
     await attached
     expect(await dialogGhost.getAttribute('aria-hidden')).toBeNull()
     expect(await dialogGhost.locator('..').getAttribute('aria-hidden')).toBe('true')
+    const exitCalls = await capturedMotion(page)
+    expect(exitCalls.some(call => call.role === 'dialog' && call.ghost
+      && call.backdropFilter === 'none'
+      && call.pointerEvents === 'none'
+      && call.ghostPointerSafe)).toBe(true)
     await dialogGhost.waitFor({ state: 'detached' })
   })
 

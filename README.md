@@ -18,6 +18,9 @@ The plugin is deliberately conservative:
   as soon as their animation settles.
 - Model and reasoning drill-in cards use a directional through-fade. Command
   option filtering is deliberately excluded so typing never retriggers motion.
+- A mounted dialog owns its entry transition, so nested slots do not animate
+  again. Backdrop-filtered glass panels freeze backdrop sampling only while the
+  short transition runs, then restore the exact theme declaration.
 - `prefers-reduced-motion` is observed live. Movement and fades are disabled
   when it is enabled.
 - There is no settings page, intensity slider, polling loop, or permanent

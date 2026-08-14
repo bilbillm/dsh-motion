@@ -41,6 +41,27 @@ describe('SurfaceClassifier', () => {
     expect(intents[1]?.related).toBe(document.querySelector('#panel'))
   })
 
+  it('gives a mounted dialog ownership over nested entry surfaces', () => {
+    const root = mount(`
+      <div role="presentation">
+        <div id="mask" aria-hidden="true"></div>
+        <section id="panel" role="dialog" aria-modal="true">
+          <div role="tabpanel"></div>
+          <div role="menu"></div>
+          <div data-slot="settings.general.item"></div>
+          <button id="tab" role="tab" aria-selected="true"></button>
+          <button id="switch" role="switch" aria-checked="false"></button>
+        </section>
+      </div>
+    `)
+    expect(classifier.classifySubtree(root).map(item => [item.kind, item.element.id])).toEqual([
+      ['dialog', 'panel'],
+      ['mask', 'mask'],
+      ['tab', 'tab'],
+      ['switch', 'switch'],
+    ])
+  })
+
   it('does not treat an unrelated nested aria-hidden node as a dialog mask', () => {
     const root = mount(`
       <div><div aria-hidden="true"><span></span></div><div role="dialog"></div></div>
