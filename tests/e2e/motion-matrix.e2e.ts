@@ -9,6 +9,8 @@ const ARTIFACTS = resolve('work/qa/playwright')
 
 interface CapturedMotion {
   readonly role: string | null
+  readonly ghost: boolean
+  readonly menuPageGhost: boolean
   readonly keyframes: Array<Record<string, unknown>>
   readonly duration: number | null
 }
@@ -34,8 +36,7 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
     page.on('pageerror', error => { consoleErrors.push(error.message) })
 
     await page.addInitScript(() => {
-      const calls: CapturedMotion[] = []
-      window.__DSH_MOTION_CALLS__ = calls
+      window.__DSH_MOTION_CALLS__ = []
       const animate = Element.prototype.animate
       Element.prototype.animate = function motionProbe(keyframes, options) {
         const frames = Array.isArray(keyframes)
@@ -44,7 +45,13 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
         const duration = typeof options === 'number'
           ? options
           : typeof options?.duration === 'number' ? options.duration : null
-        calls.push({ role: this.getAttribute('role'), keyframes: frames, duration })
+        window.__DSH_MOTION_CALLS__?.push({
+          role: this.getAttribute('role'),
+          ghost: this.hasAttribute('data-dsh-motion-ghost'),
+          menuPageGhost: this.hasAttribute('data-dsh-motion-menu-page-ghost'),
+          keyframes: frames,
+          duration,
+        })
         return animate.call(this, keyframes, options)
       }
     })
@@ -53,27 +60,92 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
     await page.locator('[data-dsh-motion-style]').waitFor({ state: 'attached' })
     await dismissOptionalButton(page, /^(继续|Continue)$/)
     await dismissOptionalButton(page, /^(稍后配置|Configure later|Skip for now)$/)
+    await motionMenuTrigger(page).waitFor({ state: 'visible' })
   })
 
   afterAll(async () => {
     await browser?.close()
   })
 
-  it('loads the client runtime and emits transform-safe menu motion', async () => {
+  it('loads the client runtime and emits a transform-safe menu exit', async () => {
     await clearCapturedMotion(page)
-    const trigger = page.locator('button[aria-haspopup="menu"]').first()
+    const trigger = motionModelTrigger(page)
     await trigger.click()
     const menu = page.getByRole('menu').first()
     await menu.waitFor({ state: 'visible' })
 
+    const exitGhost = page.locator('[data-dsh-motion-ghost]').first()
+    const attached = exitGhost.waitFor({ state: 'attached' })
+    await trigger.click()
+    await attached
     const calls = await capturedMotion(page)
-    const menuMotion = calls.find(call => call.role === 'menu')
+    const menuMotion = calls.find(call => call.ghost && call.role === 'menu')
     expect(menuMotion).toBeDefined()
     expect(menuMotion?.duration).toBeGreaterThanOrEqual(120)
     expect(menuMotion?.duration).toBeLessThanOrEqual(160)
     expect(menuMotion?.keyframes.some(frame => 'translate' in frame)).toBe(true)
     expect(menuMotion?.keyframes.every(frame => !('transform' in frame))).toBe(true)
+    expect(await exitGhost.getAttribute('aria-hidden')).toBe('true')
+    expect(await exitGhost.getAttribute('inert')).not.toBeNull()
+    await exitGhost.waitFor({ state: 'detached' })
+  })
+
+  it('through-fades model and reasoning pages inside one persistent menu', async () => {
+    const trigger = motionModelTrigger(page)
+    if (await trigger.count() === 0) return
     await trigger.click()
+    const drillIn = page.getByRole('menuitem').first()
+    await drillIn.waitFor({ state: 'visible' })
+    await clearCapturedMotion(page)
+
+    const pageGhost = page.locator('[data-dsh-motion-menu-page-ghost]').first()
+    const attached = pageGhost.waitFor({ state: 'attached' })
+    await drillIn.click()
+    await attached
+    const calls = await capturedMotion(page)
+    expect(calls.some(call => call.menuPageGhost && call.keyframes.at(-1)?.opacity === 0)).toBe(true)
+    expect(calls.some(call => !call.ghost && call.role === 'menu'
+      && call.keyframes[0]?.opacity === 0)).toBe(true)
+    await pageGhost.waitFor({ state: 'detached' })
+    await trigger.click()
+  })
+
+  it('animates workspace group height and fades removed rows on collapse', async () => {
+    const workspace = page.locator(
+      '[data-slot="sidebar.workspaces"] [role="treeitem"][aria-expanded]',
+    ).first()
+    if (await workspace.count() === 0) return
+    if (await workspace.getAttribute('aria-expanded') === 'true') {
+      await workspace.click()
+      await expect.poll(() => workspace.getAttribute('aria-expanded')).toBe('false')
+      await page.waitForTimeout(260)
+    }
+
+    const collapsedRows = await page.locator(
+      '[data-slot="sidebar.workspaces"] [role="treeitem"]',
+    ).count()
+    await clearCapturedMotion(page)
+    await workspace.click()
+    await expect.poll(() => workspace.getAttribute('aria-expanded')).toBe('true')
+    const expandedRows = await page.locator(
+      '[data-slot="sidebar.workspaces"] [role="treeitem"]',
+    ).count()
+    if (expandedRows <= collapsedRows) return
+    await expect.poll(async () => (
+      await capturedMotion(page)
+    ).some(call => call.keyframes.some(frame => 'height' in frame))).toBe(true)
+    await page.waitForTimeout(260)
+
+    await clearCapturedMotion(page)
+    const rowGhost = page.locator('[data-dsh-motion-disclosure-ghost]').first()
+    const attached = rowGhost.waitFor({ state: 'attached' })
+    await workspace.click()
+    await attached
+    expect(await rowGhost.getAttribute('aria-hidden')).toBe('true')
+    await expect.poll(async () => (
+      await capturedMotion(page)
+    ).some(call => call.keyframes.some(frame => 'height' in frame))).toBe(true)
+    await rowGhost.waitFor({ state: 'detached' })
   })
 
   it('keeps dialog focus, geometry, and four themes stable at desktop and narrow widths', async () => {
@@ -122,13 +194,20 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
     expect(await page.locator('[role="tabpanel"][hidden]').count()).toBeGreaterThanOrEqual(1)
     expect(await tabs.nth(1).getAttribute('data-dsh-motion-state')).toBe('on')
     expect(await page.getByRole('dialog').boundingBox()).toEqual(before)
+
+    const dialogGhost = page.locator('[data-dsh-motion-ghost] [role="dialog"]').first()
+    const attached = dialogGhost.waitFor({ state: 'attached' })
+    await page.getByRole('button', { name: /^(关闭|Close)$/ }).click()
+    await attached
+    expect(await dialogGhost.getAttribute('aria-hidden')).toBeNull()
+    expect(await dialogGhost.locator('..').getAttribute('aria-hidden')).toBe('true')
+    await dialogGhost.waitFor({ state: 'detached' })
   })
 
   it('suppresses transient motion under prefers-reduced-motion', async () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await page.getByRole('button', { name: /^(关闭|Close)$/ }).click()
     await clearCapturedMotion(page)
-    const trigger = page.locator('button[aria-haspopup="menu"]').first()
+    const trigger = motionMenuTrigger(page)
     await trigger.click()
     await page.getByRole('menu').first().waitFor({ state: 'visible' })
     expect((await capturedMotion(page)).filter(call => call.role === 'menu')).toEqual([])
@@ -143,7 +222,9 @@ describe.runIf(E2E_URL !== undefined)('dsh-motion browser matrix', () => {
 
 async function dismissOptionalButton(page: Page, label: RegExp): Promise<void> {
   const button = page.getByRole('button', { name: label }).first()
-  if (await button.isVisible()) await button.click()
+  const appeared = await button.waitFor({ state: 'visible', timeout: 2_000 })
+    .then(() => true, () => false)
+  if (appeared) await button.click()
 }
 
 async function clearCapturedMotion(page: Page): Promise<void> {
@@ -152,4 +233,16 @@ async function clearCapturedMotion(page: Page): Promise<void> {
 
 async function capturedMotion(page: Page): Promise<CapturedMotion[]> {
   return page.evaluate(() => window.__DSH_MOTION_CALLS__ ?? [])
+}
+
+function motionMenuTrigger(page: Page) {
+  return page.locator(
+    'button[aria-label^="访问模式"], button[aria-label^="Access mode"]',
+  ).first()
+}
+
+function motionModelTrigger(page: Page) {
+  return page.locator(
+    'button[aria-label*="选择模型"], button[aria-label*="Select model"]',
+  ).first()
 }

@@ -66,6 +66,29 @@ describe('ThemeCompatibility', () => {
     }
   })
 
+  it('allows only finite semantic popovers inside composer ownership', () => {
+    const root = element(`
+      <div data-composer-card>
+        <div id="plain"></div>
+        <div id="menu" role="menu"></div>
+        <div id="listbox" role="listbox"></div>
+      </div>
+    `)
+    expect(compatibility.canAnimate(root.querySelector('#plain') as HTMLElement, 'slot')).toBe(false)
+    expect(compatibility.canAnimate(root.querySelector('#menu') as HTMLElement, 'menu')).toBe(true)
+    expect(compatibility.canAnimate(root.querySelector('#listbox') as HTMLElement, 'listbox')).toBe(true)
+  })
+
+  it('allows workspace disclosure without opening general sidebar ownership', () => {
+    const root = element(`
+      <div data-slot="sidebar.workspaces">
+        <div id="section"><div id="workspace" role="treeitem" aria-expanded="true"></div></div>
+      </div>
+    `)
+    expect(compatibility.canAnimate(root.querySelector('#workspace') as HTMLElement, 'disclosure')).toBe(true)
+    expect(compatibility.canAnimate(root.querySelector('#section') as HTMLElement, 'slot')).toBe(false)
+  })
+
   it('skips sidebar slot motion while allowing its fixed settings dialog', () => {
     const root = element(`
       <div data-slot="sidebar">

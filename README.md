@@ -3,16 +3,21 @@
 # dsh-motion
 
 `@dsh-external/dsh-motion` is a small, zero-configuration browser plugin for
-DeepSeek Harness. It adds short entry motion to semantic menus, listboxes,
-dialogs, tab panels, conversation page layers, and state changes on tabs and
-switches.
+DeepSeek Harness. It adds restrained entry, exit, and state-change motion to
+semantic menus, listboxes, dialogs, tab panels, conversation page layers,
+tabs, switches, and workspace disclosure groups.
 
 The plugin is deliberately conservative:
 
 - Harness and theme-owned animation wins. Ambiguous surfaces are skipped.
 - Only `opacity`, independent `translate`/`scale`, and color properties are
-  animated. Layout, positioning transforms, dimensions, and scroll containers
-  are left alone.
+  used for transient surfaces. Workspace disclosure alone animates its
+  semantic group height; AppFrame columns and sidebar geometry remain untouched.
+- Menus, listboxes, dialogs, and masks receive paired exits through short-lived
+  visual ghosts. Ghosts are `aria-hidden`, inert, pointer-disabled, and removed
+  as soon as their animation settles.
+- Model and reasoning drill-in cards use a directional through-fade. Command
+  option filtering is deliberately excluded so typing never retriggers motion.
 - `prefers-reduced-motion` is observed live. Movement and fades are disabled
   when it is enabled.
 - There is no settings page, intensity slider, polling loop, or permanent
@@ -47,10 +52,11 @@ used by the default `light`/`dark` themes and by `angelina-light`/
 `angelina-dark`; it does not depend on CSS-module class hashes.
 
 The following host-owned regions remain outside the plugin's ownership:
-sidebar/layout geometry, workspace and trajectory interaction, tooltips,
-toasts, composer surfaces, streaming chat rows, and Angelina parallax layers.
-A theme that changes those semantics should add a narrow adapter rather than
-relying on broad selectors.
+AppFrame and sidebar geometry, Trajectory interaction, tooltips, toasts,
+composer layout, streaming chat rows, large page-exit clones, and Angelina
+parallax layers. Semantic menus/listboxes inside the composer and workspace
+tree-group disclosure are the two narrow exceptions. A theme that changes
+those semantics should add an explicit adapter rather than broad selectors.
 
 ## Development
 
@@ -69,8 +75,9 @@ $env:DSH_MOTION_E2E_URL = 'http://127.0.0.1:3080/'
 pnpm run test:e2e
 ```
 
-That suite covers the four themes, desktop/narrow viewports, menus, dialogs,
-tabs/tab panels, layout/focus invariants, and reduced-motion emulation. See
+That suite covers the four themes, desktop/narrow viewports, paired transient
+exits, model/reasoning card changes, workspace disclosure, dialogs, tabs/tab
+panels, layout/focus invariants, and reduced-motion emulation. See
 [`docs/compatibility.md`](docs/compatibility.md) for the latest verified host
 matrix and explicit gaps.
 

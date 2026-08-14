@@ -63,6 +63,220 @@ describe('MotionRuntime', () => {
     runtime.dispose()
   })
 
+  it('keeps an inert visual ghost long enough to animate a removed menu out', async () => {
+    const { runtime, calls } = runtimeFixture()
+    const menu = document.createElement('div')
+    menu.id = 'menu-id'
+    menu.setAttribute('role', 'menu')
+    menu.innerHTML = '<button id="action">Run</button>'
+    document.body.appendChild(menu)
+    await mutationTurn()
+    runtime.flushNow()
+
+    menu.remove()
+    await mutationTurn()
+    runtime.flushNow()
+
+    const ghost = document.querySelector<HTMLElement>('[data-dsh-motion-ghost]')
+    expect(ghost).not.toBeNull()
+    expect(ghost?.getAttribute('aria-hidden')).toBe('true')
+    expect(ghost?.hasAttribute('inert')).toBe(true)
+    expect(ghost?.querySelector('[id]')).toBeNull()
+    expect(calls).toHaveLength(2)
+    expect(calls[1]?.keyframes).toMatchObject([{ opacity: 1 }, { opacity: 0 }])
+
+    runtime.dispose()
+    expect(document.querySelector('[data-dsh-motion-ghost]')).toBeNull()
+  })
+
+  it('animates model, permission, and command surfaces inside composer ownership', async () => {
+    const { runtime, calls } = runtimeFixture()
+    const composer = document.createElement('div')
+    composer.setAttribute('data-composer-card', '')
+    composer.innerHTML = `
+      <div id="model" role="menu"></div>
+      <div id="permission" role="menu"></div>
+      <div data-slot="conversation.input.overlay"><div id="commands" role="listbox"></div></div>
+    `
+    document.body.appendChild(composer)
+    await mutationTurn()
+    runtime.flushNow()
+    expect(calls.map(call => call.element.id)).toEqual(['model', 'permission', 'commands'])
+    runtime.dispose()
+  })
+
+  it('crossfades drill-in menu cards when one semantic page replaces another', async () => {
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    menu.setAttribute('aria-label', 'Model and reasoning')
+    menu.innerHTML = `
+      <button role="menuitem">Model</button>
+      <button role="menuitem">Reasoning</button>
+    `
+    document.body.appendChild(menu)
+    const { runtime, calls } = runtimeFixture()
+
+    menu.replaceChildren()
+    const model = document.createElement('button')
+    model.setAttribute('role', 'menuitemradio')
+    model.textContent = 'DeepSeek V4'
+    menu.appendChild(model)
+    await mutationTurn()
+    runtime.flushNow()
+
+    const ghost = document.querySelector<HTMLElement>('[data-dsh-motion-menu-page-ghost]')
+    expect(ghost?.textContent).toContain('Reasoning')
+    expect(ghost?.getAttribute('aria-hidden')).toBe('true')
+    expect(calls.map(call => call.element)).toContain(menu)
+    expect(calls.some(call => call.element === ghost && call.keyframes[1]?.opacity === 0)).toBe(true)
+    expect(calls.some(call => call.element === menu && call.keyframes[0]?.opacity === 0)).toBe(true)
+
+    runtime.dispose()
+    expect(document.querySelector('[data-dsh-motion-menu-page-ghost]')).toBeNull()
+  })
+
+  it('does not animate listbox option filtering as a card replacement', async () => {
+    const listbox = document.createElement('div')
+    listbox.setAttribute('role', 'listbox')
+    listbox.innerHTML = '<div role="option">Plan</div>'
+    document.body.appendChild(listbox)
+    const { runtime, calls } = runtimeFixture()
+
+    listbox.replaceChildren()
+    const option = document.createElement('div')
+    option.setAttribute('role', 'option')
+    option.textContent = 'Permission'
+    listbox.appendChild(option)
+    await mutationTurn()
+    runtime.flushNow()
+
+    expect(calls).toHaveLength(0)
+    expect(document.querySelector('[data-dsh-motion-menu-page-ghost]')).toBeNull()
+    runtime.dispose()
+  })
+
+  it('pairs dialog and mask exit motion in one inaccessible overlay ghost', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Settings'
+    const overlay = document.createElement('div')
+    overlay.setAttribute('role', 'presentation')
+    overlay.innerHTML = `
+      <div aria-hidden="true"></div>
+      <section role="dialog" aria-modal="true"><button>Close</button></section>
+    `
+    document.body.append(trigger, overlay)
+    const { runtime, calls } = runtimeFixture()
+    trigger.focus()
+
+    overlay.remove()
+    await mutationTurn()
+    runtime.flushNow()
+
+    const ghost = document.querySelector<HTMLElement>('[data-dsh-motion-ghost]')
+    expect(ghost?.getAttribute('role')).toBe('presentation')
+    expect(ghost?.getAttribute('aria-hidden')).toBe('true')
+    expect(document.activeElement).toBe(trigger)
+    expect(calls.map(call => call.element.getAttribute('role') ?? 'mask')).toEqual(['dialog', 'mask'])
+    runtime.dispose()
+  })
+
+  it('animates workspace disclosure height and preserves removed rows as fading ghosts', async () => {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-slot', 'sidebar.workspaces')
+    const tree = document.createElement('div')
+    tree.setAttribute('role', 'tree')
+    const section = document.createElement('div')
+    const header = document.createElement('span')
+    const workspace = document.createElement('div')
+    workspace.setAttribute('role', 'treeitem')
+    workspace.setAttribute('aria-expanded', 'true')
+    const session = document.createElement('div')
+    session.setAttribute('role', 'treeitem')
+    session.textContent = 'New Session'
+    header.appendChild(workspace)
+    section.append(header, session)
+    tree.appendChild(section)
+    slot.appendChild(tree)
+    document.body.appendChild(slot)
+    Object.defineProperty(section, 'getBoundingClientRect', {
+      value: () => ({
+        width: 240,
+        height: workspace.getAttribute('aria-expanded') === 'true' ? 66 : 34,
+        top: 0,
+        left: 0,
+        right: 240,
+        bottom: workspace.getAttribute('aria-expanded') === 'true' ? 66 : 34,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    })
+    Object.defineProperty(session, 'getBoundingClientRect', {
+      value: () => ({
+        width: 220, height: 32, top: 34, left: 8, right: 228, bottom: 66,
+        x: 8, y: 34, toJSON: () => ({}),
+      }),
+    })
+    const { runtime, calls } = runtimeFixture()
+    Object.defineProperty(workspace, 'getAnimations', {
+      value: () => [{ playState: 'running' }],
+    })
+
+    workspace.setAttribute('aria-expanded', 'false')
+    session.remove()
+    await mutationTurn()
+    runtime.flushNow()
+
+    expect(calls.some(call => call.element === section
+      && call.keyframes[0]?.height === '66px'
+      && call.keyframes[1]?.height === '34px')).toBe(true)
+    expect(document.querySelector('[data-dsh-motion-disclosure-ghost]')?.textContent).toBe('New Session')
+    expect(calls.some(call => call.element.hasAttribute('data-dsh-motion-disclosure-ghost')
+      && call.keyframes[1]?.opacity === 0)).toBe(true)
+
+    const nextSession = document.createElement('div')
+    nextSession.setAttribute('role', 'treeitem')
+    nextSession.textContent = 'New Session'
+    Object.defineProperty(nextSession, 'getBoundingClientRect', {
+      value: () => ({
+        width: 220, height: 32, top: 34, left: 8, right: 228, bottom: 66,
+        x: 8, y: 34, toJSON: () => ({}),
+      }),
+    })
+    workspace.setAttribute('aria-expanded', 'true')
+    section.appendChild(nextSession)
+    await mutationTurn()
+    runtime.flushNow()
+    expect(calls.some(call => call.element === section
+      && call.keyframes[0]?.height === '34px'
+      && call.keyframes[1]?.height === '66px')).toBe(true)
+    expect(document.querySelector('[data-dsh-motion-disclosure-ghost]')).toBeNull()
+    runtime.dispose()
+  })
+
+  it('does not manufacture exit ghosts while reduced motion is enabled', async () => {
+    const media = mutableMediaQuery(true)
+    const policy = new MotionPolicy({ tokenSource: document.documentElement, mediaQuery: media.query })
+    const { runtime, calls } = runtimeFixture(policy)
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    menu.innerHTML = '<button role="menuitem">Model</button>'
+    document.body.appendChild(menu)
+    await mutationTurn()
+    runtime.flushNow()
+    menu.innerHTML = '<button role="menuitemradio">DeepSeek V4</button>'
+    await mutationTurn()
+    runtime.flushNow()
+    expect(document.querySelector('[data-dsh-motion-menu-page-ghost]')).toBeNull()
+    menu.remove()
+    await mutationTurn()
+    runtime.flushNow()
+    expect(calls).toEqual([])
+    expect(document.querySelector('[data-dsh-motion-ghost]')).toBeNull()
+    runtime.dispose()
+    policy.dispose()
+  })
+
   it('coalesces consecutive page state changes into one frame', async () => {
     const { runtime, calls } = runtimeFixture()
     const page = document.createElement('main')

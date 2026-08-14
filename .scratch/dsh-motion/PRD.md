@@ -12,7 +12,7 @@ DeepSeek Harness 的产品能力、界面组件和主题都通过插件组合。
 
 ## Solution
 
-构建独立的 `dsh-motion` 浏览器插件，通过 DeepSeek Harness 的 bundle patch 和 client plugin 加载机制安装一个轻量 Motion Runtime。Runtime 使用语义化 DOM 信息、MutationObserver 和 Web Animations API，在不接管宿主组件状态的前提下为有限的界面状态增加进入、切换和反馈动效。
+构建独立的 `dsh-motion` 浏览器插件，通过 DeepSeek Harness 的 bundle patch 和 client plugin 加载机制安装一个轻量 Motion Runtime。Runtime 使用语义化 DOM 信息、MutationObserver 和 Web Animations API，在不接管宿主组件状态的前提下为有限的界面状态增加进入、退场、切换和反馈动效。
 
 动效读取宿主主题提供的缓动和时长 token，不写死颜色、背景、阴影或字体。动画优先使用 `opacity`、独立的 `translate`、`scale` 和颜色过渡，避免覆盖菜单定位或主题已有的 `transform`。所有动画都尊重 `prefers-reduced-motion`，并在用户运行时切换系统偏好后立即生效。
 
@@ -55,6 +55,10 @@ DeepSeek Harness 的产品能力、界面组件和主题都通过插件组合。
 29. As a contributor, I want tests to describe observable motion eligibility, accessibility preservation, and lifecycle behavior, so that refactors do not silently broaden the animation scope.
 30. As a user, I want concise installation and compatibility documentation, so that I can enable or disable the plugin without reading its implementation.
 31. As a maintainer, I want the repository to remain suitable for later publication under the `dsh-plugin` topic, so that the plugin can be discovered by the community once it is stable.
+32. As a user, I want model and reasoning drill-in cards to transition in both directions, so that replacing content inside one persistent menu does not look like an abrupt redraw.
+33. As a user, I want command, permission, model, and reasoning cards to leave as deliberately as they enter, so that transient surfaces use one coherent motion language.
+34. As a user, I want the settings panel and mask to leave together, so that closing the modal does not collapse in two unrelated steps.
+35. As a user, I want workspace groups to expand and collapse smoothly while their rows fade, so that disclosure remains easy to track without changing sidebar width or selection.
 
 ## Implementation Decisions
 
@@ -67,22 +71,24 @@ DeepSeek Harness 的产品能力、界面组件和主题都通过插件组合。
   - The Cordis client adapter owns installation and lifecycle effects and exposes no new host application state.
 - Stable semantic signals are the primary integration surface: ARIA roles for menus, listboxes, dialogs, tabs, tab panels, and switches; official `data-slot` markers; and documented state attributes. Broad descendant scans, polling, React state interception, and CSS-module hash selectors are prohibited.
 - Observation is event-driven. The runtime scans only added subtrees and relevant attribute changes, schedules at most one intent per element and state transition, and has no steady-state animation frame loop.
-- Web Animations API is used for transient motion. The runtime prefers independent CSS transform components where browser support allows them, so menu placement transforms remain owned by the host. It never animates layout properties such as width, height, top, left, or position.
+- Web Animations API is used for transient motion. The runtime prefers independent CSS transform components where browser support allows them, so menu placement transforms remain owned by the host. It does not animate layout properties except the measured height of a semantic workspace disclosure group.
 - Theme colors, easing, and durations come from inherited theme tokens and computed styles. If a required token is unavailable, the policy uses a short validated fallback and records the reason through development diagnostics; it does not invent a palette.
 - The default light and dark themes are the primary tuning baseline. `angelina-light` and `angelina-dark` are required acceptance targets because they alter visual tokens and imagery without changing the supported surface semantics.
 - Themes that change layout or replace semantics are handled conservatively: the classifier may skip an ambiguous node, and a future explicit adapter registry may add support. Version one does not attempt to infer arbitrary structural replacements.
 - Accessibility and host behavior are invariant: ARIA attributes, focus, keyboard order, pointer hit testing, scroll position, and application state must be unchanged before and after an animation. Reduced motion suppresses non-essential movement rather than suppressing state updates.
-- Existing host-owned animations are outside the plugin's ownership. Surface classification must exclude the known sidebar, tooltip, toast, workspace, and trajectory animation roots unless an explicit future adapter opts in.
+- Existing host-owned animations are outside the plugin's ownership. Surface classification excludes AppFrame/sidebar geometry, tooltip, toast, Trajectory, streaming content, and parallax roots. Workspace ownership is limited to semantic tree-group disclosure, and composer ownership is limited to semantic menu/listbox overlays.
 - Version one is deliberately zero-configuration. Surface eligibility and duration bounds are fixed and conservative, while `prefers-reduced-motion` remains the user-controlled accessibility policy.
 - The compatibility target is the current local Harness integration line and the published `@deepseek-ai/dsh` release line represented by `0.1.0-rc.6`. Dependencies use the scoped Cordis package expected by that line.
-- The plugin does not clone removed DOM nodes to manufacture exit animations. Entry and state-change transitions are the reliable external-plugin surface for version one.
+- Finite transient surfaces (`menu`, `listbox`, `dialog`, and mask) may use short-lived visual clones for exit motion after host unmount. These clones are inaccessible, inert, pointer-disabled, stripped of identifiers and ARIA references, and removed on settlement. Large page and conversation DOM is never cloned.
+- Model/reasoning pages that replace the children of one persistent semantic menu use a directional through-fade. Listbox option filtering is explicitly excluded from this replacement path.
+- Workspace disclosure uses the nearest `role="tree"` boundary to measure the group, animates only group height, and fades removed row clones during collapse.
 
 ## Testing Decisions
 
 - Tests assert externally observable behavior: which semantic surfaces are eligible, whether an animation intent is emitted once, whether state and accessibility attributes are preserved, and whether teardown stops future work. Tests should not lock in private helper names or a particular Web Animations API call sequence.
 - `SurfaceClassifier` receives focused unit coverage for menu, submenu, listbox, dialog, mask, tab, tab panel, switch, slot content, ambiguous nodes, and excluded host-owned roots.
 - `MotionPolicy` receives unit coverage for light, dark, Angelina Light, Angelina Dark, missing tokens, duration validation, reduced-motion at startup, and live media-query changes.
-- `MotionRuntime` receives JSDOM lifecycle coverage for subtree insertion, relevant attribute mutation, deduplication, cancellation, focus and ARIA preservation, scroll stability, reduced-motion no-op behavior, and complete disposal.
+- `MotionRuntime` receives JSDOM lifecycle coverage for subtree insertion, relevant attribute mutation, deduplication, finite exit ghosts, persistent-menu page replacement, workspace disclosure, cancellation, focus and ARIA preservation, scroll stability, reduced-motion no-op behavior, and complete disposal.
 - The Cordis client adapter receives a lifecycle test proving installation and unload dispose observers, media-query listeners, and active animations exactly once.
 - The built bundle receives a smoke test with a fake Harness module loader. The test proves that the client entry is discoverable, the Node entry does not require browser globals, and the patch metadata composes with a profile.
 - An isolated profile composition test installs the local package through the same `dsh plugin --profile web add .` workflow used by users, then boots the browser graph.
@@ -96,13 +102,12 @@ DeepSeek Harness 的产品能力、界面组件和主题都通过插件组合。
 - Redesigning page layout, spacing, typography, colors, icons, or component hierarchy.
 - Replacing or rewriting the default theme or either Angelina theme.
 - Guaranteeing automatic support for themes that replace DOM semantics or substantially rearrange layout.
-- Generic exit animations that require cloning or delaying host-owned unmounts.
+- Generic exit animations for large page/conversation DOM or any exit that delays a host-owned unmount.
 - Animating every element or applying a global `transition` rule.
-- Overriding existing sidebar, tooltip, toast, workspace, or trajectory animations.
+- Overriding AppFrame/sidebar geometry, tooltip, toast, Trajectory, or host-owned positioning animations.
 - Adding a new host motion service, changing Harness React components, or modifying the agent loop.
 - Analytics, remote configuration, telemetry, or a continuously running animation scheduler.
 - A mobile-specific visual redesign; narrow viewport behavior is limited to compatibility and no-regression validation.
-- Publishing to GitHub or adding topics in this PRD phase; publication follows implementation and verification.
 
 ## Further Notes
 
@@ -118,17 +123,28 @@ DeepSeek Harness 的产品能力、界面组件和主题都通过插件组合。
 - Implemented the dual-half package, insertion patch, token/reduced-motion
   policy, semantic classifier, theme compatibility gate, observer/runtime, and
   Cordis lifecycle adapter.
+- Added paired entry/exit motion for model and permission menus, command
+  listboxes, and settings dialog/mask overlays. Exit visuals are inert,
+  inaccessible, pointer-disabled, and fully cleaned up.
+- Added directional through-fades for the model and reasoning cards even though
+  Harness replaces their children inside one persistent menu node. Command
+  list filtering remains unanimated after initial entry.
+- Added semantic workspace disclosure motion: measured group-height transitions
+  in both directions and fading row ghosts on collapse, without taking ownership
+  of sidebar width, selection, or scrolling.
 - Added focused unit/JSDOM, lifecycle, bundle, package, and optional Playwright
-  matrix coverage. The default suite passes against published `rc.6` types.
+  matrix coverage for reduced motion, exit cleanup, card replacement, and
+  disclosure behavior. The default suite passes against published `rc.6` types.
 - Installed the package into an isolated local `rc.5` Web profile and verified
-  all four themes at desktop and narrow viewports with no page-level overflow
-  or console errors.
+  the supported surfaces against all four themes. Real-browser probes captured
+  the expected finite ghost lifetimes and workspace height interpolation with
+  no layout jump, focus loss, or plugin console error.
 - Browser QA found and fixed two overly broad exclusions: Angelina's parallax
   ownership marker lives on `body`, and settings dialogs live below the
   sidebar slot. Only actual parallax layers/sidebar content remain excluded.
-- The current host does not expose a live submenu, non-Trajectory switch, or
-  conversation tab in a blank isolated profile. Those semantic paths are
-  covered by focused tests and remain in the opt-in Playwright suite for a
-  seeded profile.
+- The current host exposes model and reasoning drill-in cards through child
+  replacement inside a persistent menu rather than nested menu mounts; this
+  production path is now covered directly. The non-Trajectory switch and large
+  conversation page-exit paths remain outside production ownership.
 - Published the public repository with `dsh-plugin`, `dsh`, and
   `deepseek-harness` topics for ecosystem discovery.

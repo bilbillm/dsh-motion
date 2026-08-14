@@ -17,6 +17,10 @@ client lifecycle, package metadata, bundle registration, and the Node half.
 The assertions include:
 
 - one animation per semantic state change and same-frame coalescing;
+- paired, inaccessible exit ghosts for menu, listbox, dialog, and mask removal;
+- directional through-fades for model/reasoning menu-page replacement without
+  retriggering command-list filtering;
+- workspace tree-group height motion and fading removed-row ghosts;
 - host WAAPI/CSS animation precedence and `data-dsh-motion="off"`;
 - live reduced-motion changes and cancellation;
 - focus, ARIA, scroll, and layout invariants;
@@ -37,8 +41,10 @@ console remained free of warnings and errors.
 
 | Surface | Light | Dark | Angelina Light | Angelina Dark |
 | --- | --- | --- | --- | --- |
-| Menu positioning | Pass | Pass | Pass | Pass |
-| Settings dialog and mask | Pass | Pass | Pass | Pass |
+| Model/reasoning card drill-in | Pass | Pass | Pass | Pass |
+| Command and permission paired exit | Pass | Pass | Pass | Pass |
+| Settings dialog and mask paired exit | Pass | Pass | Pass | Pass |
+| Workspace expand/collapse | Pass | Pass | Pass | Pass |
 | Settings tab and tabpanel | Pass | Pass | Pass | Pass |
 | Desktop 1440x900 overflow | Pass | Pass | Pass | Pass |
 | Narrow 390x844 overflow | Pass | Pass | Pass | Pass |
@@ -46,13 +52,14 @@ console remained free of warnings and errors.
 
 The dialog remained inside the viewport, did not change dimensions during tab
 switches, retained focus inside the modal, and produced no document-level
-horizontal overflow. Angelina parallax layers remained present while ordinary
-UI motion stayed enabled; only `data-dsh-angelina-layer` subtrees are excluded.
+horizontal overflow. Transient exit clones remained inert and disappeared at
+settlement. Workspace groups interpolated between measured heights and removed
+rows faded without changing the selected tree item. Angelina parallax layers
+remained present while ordinary UI motion stayed enabled; only
+`data-dsh-angelina-layer` subtrees are excluded.
 
 ## Current Host Gaps
 
-- The current composition has no interactive production submenu; nested menus
-  are covered by classifier/runtime tests against the shared semantic contract.
 - The only production `role="switch"` found is inside Trajectory, which is an
   explicit host-owned exclusion. Switch state behavior is covered by JSDOM.
 - A blank isolated profile cannot expose conversation view tabs or an active

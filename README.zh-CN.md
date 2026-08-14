@@ -2,12 +2,14 @@
 
 # dsh-motion
 
-`@dsh-external/dsh-motion` 是一个面向 DeepSeek Harness 的轻量、零配置浏览器插件。它为具有稳定语义标记的菜单、列表框、对话框、标签面板、对话页面内容层，以及 Tab 和 Switch 的状态变化增加短促、克制的动效。
+`@dsh-external/dsh-motion` 是一个面向 DeepSeek Harness 的轻量、零配置浏览器插件。它为具有稳定语义标记的菜单、列表框、对话框、标签面板、对话页面内容层、Tab、Switch 和工作区分组展开状态增加短促、克制的进入、退场与状态切换动效。
 
 插件有意保持保守：
 
 - Harness 或主题自带的动画优先；无法可靠判断的界面会被跳过。
-- 只动画 `opacity`、独立的 `translate`/`scale` 和颜色属性，不接管布局、定位 `transform`、尺寸或滚动容器。
+- 瞬态界面只动画 `opacity`、独立的 `translate`/`scale` 和颜色属性。只有工作区语义分组会动画自身高度；AppFrame 列宽和侧栏几何仍由宿主管理。
+- 菜单、列表框、对话框和遮罩使用成对退场效果。退场副本始终设置为 `aria-hidden`、`inert`、不可点击，并在动画结束后立即移除。
+- 模型和推理等级卡片换页采用带方向提示的 through-fade；命令列表筛选不会因选项更新而反复触发动效。
 - 实时监听 `prefers-reduced-motion`；启用减少动态效果后，会关闭位移和淡入。
 - 不增加设置页面、强度滑杆、轮询或常驻动画帧循环。
 
@@ -33,7 +35,7 @@ dsh plugin --profile web add C:\path\to\dsh-motion
 
 当前版本针对本地 Harness `0.1.0-rc.5` 源码和已发布的 `0.1.0-rc.6` 客户端运行时依赖进行测试。插件适配默认的 `light`/`dark` 主题和 `angelina-light`/`angelina-dark` 主题所使用的语义标记，不依赖 CSS Module 哈希类名。
 
-以下由宿主负责的区域不属于插件的控制范围：侧栏和布局几何、Workspace 与 Trajectory 交互、Tooltip、Toast、Composer、流式对话行以及 Angelina 视差图层。改变这些语义的主题应增加范围明确的适配器，而不是依赖宽泛选择器。
+以下由宿主负责的区域不属于插件的控制范围：AppFrame 与侧栏几何、Trajectory 交互、Tooltip、Toast、Composer 排版、流式对话行、大型页面退场副本以及 Angelina 视差图层。Composer 内的语义菜单/列表框和工作区树分组展开是两个范围明确的例外。改变这些语义的主题应增加显式适配器，而不是依赖宽泛选择器。
 
 ## 开发
 
@@ -50,7 +52,7 @@ $env:DSH_MOTION_E2E_URL = 'http://127.0.0.1:3080/'
 pnpm run test:e2e
 ```
 
-该测试矩阵覆盖四个主题、桌面和窄屏视口、菜单、对话框、Tab/Tabpanel、布局与焦点不变量，以及减少动态效果模拟。最新的宿主验证矩阵和明确保留的测试缺口见 [`docs/compatibility.md`](docs/compatibility.md)。
+该测试矩阵覆盖四个主题、桌面和窄屏视口、瞬态界面的成对退场、模型/推理卡片换页、工作区展开折叠、对话框、Tab/Tabpanel、布局与焦点不变量，以及减少动态效果模拟。最新的宿主验证矩阵和明确保留的测试缺口见 [`docs/compatibility.md`](docs/compatibility.md)。
 
 ## 分发入口
 

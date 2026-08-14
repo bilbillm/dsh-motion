@@ -84,6 +84,65 @@ describe('SurfaceClassifier', () => {
     expect(intents.find(item => item.kind === 'page')?.element.tagName).toBe('MAIN')
   })
 
+  it('allows semantic menus and listboxes inside the composer without animating the composer itself', () => {
+    const root = mount(`
+      <div data-composer-card>
+        <div data-composer-seat data-phase="active"></div>
+        <div id="model" role="menu"></div>
+        <div id="permission" role="menu"></div>
+        <div data-slot="conversation.input.overlay">
+          <div id="commands" role="listbox"></div>
+        </div>
+      </div>
+    `)
+    expect(classifier.classifySubtree(root).map(item => [item.kind, item.element.id])).toEqual([
+      ['menu', 'model'],
+      ['menu', 'permission'],
+      ['listbox', 'commands'],
+    ])
+  })
+
+  it('classifies workspace tree disclosure state changes', () => {
+    const root = mount(`
+      <div data-slot="sidebar.workspaces">
+        <div><div id="workspace" role="treeitem" aria-expanded="false"></div></div>
+      </div>
+    `)
+    const workspace = root.querySelector<HTMLElement>('#workspace') as HTMLElement
+    workspace.setAttribute('aria-expanded', 'true')
+    expect(classifier.classifyAttribute(workspace, 'aria-expanded', 'false')).toMatchObject([
+      { kind: 'disclosure', trigger: 'state', state: 'aria-expanded=true' },
+    ])
+  })
+
+  it('describes finite transient surfaces when their host subtree is removed', () => {
+    const menu = mount('<div role="menu"><button role="menuitem">Run</button></div>')
+    expect(classifier.classifyRemoval(menu)).toMatchObject([
+      { root: menu, surfaces: [{ element: menu, kind: 'menu' }] },
+    ])
+
+    const listbox = mount('<div role="listbox"><div role="option">Compact</div></div>')
+    expect(classifier.classifyRemoval(listbox)).toMatchObject([
+      { root: listbox, surfaces: [{ element: listbox, kind: 'listbox' }] },
+    ])
+
+    const overlay = mount(`
+      <div role="presentation">
+        <div id="mask" aria-hidden="true"></div>
+        <section id="dialog" role="dialog" aria-modal="true"></section>
+      </div>
+    `)
+    expect(classifier.classifyRemoval(overlay)).toMatchObject([
+      {
+        root: overlay,
+        surfaces: [
+          { element: overlay.querySelector('#dialog'), kind: 'dialog' },
+          { element: overlay.querySelector('#mask'), kind: 'mask' },
+        ],
+      },
+    ])
+  })
+
   it('does not animate individual streaming rows', () => {
     const root = mount(`
       <div data-chat-flow>

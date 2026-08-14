@@ -9,6 +9,7 @@ export type MotionKind =
   | 'slot'
   | 'tab'
   | 'switch'
+  | 'disclosure'
 
 /** Resolved policy for one short animation. */
 export interface MotionTiming {
@@ -64,6 +65,7 @@ const RULES: Readonly<Record<MotionKind, DurationRule>> = Object.freeze({
   slot: { token: 'fastMs', fallbackMs: 140, minMs: 120, maxMs: 160, distancePx: 3, scaleFrom: 1 },
   tab: { token: 'fastMs', fallbackMs: 120, minMs: 80, maxMs: 140, distancePx: 0, scaleFrom: 1 },
   switch: { token: 'fastMs', fallbackMs: 120, minMs: 80, maxMs: 140, distancePx: 0, scaleFrom: 1 },
+  disclosure: { token: 'normalMs', fallbackMs: 180, minMs: 160, maxMs: 220, distancePx: 2, scaleFrom: 1 },
 })
 
 /** Parse one CSS time token into milliseconds. */

@@ -6,11 +6,10 @@ export interface ThemeCompatibilityOptions {
 
 const ALWAYS_EXCLUDED = [
   '[data-dsh-motion="off"]',
+  '[data-dsh-motion-ghost]',
   '[data-chat-flow]',
   '[data-chat-flow-key]',
   '[data-streaming]',
-  '[data-composer-seat]',
-  '[data-composer-card]',
   '[data-dsh-angelina-layer]',
   '[data-trajectory-scroll]',
   '[data-trajectory-row-key]',
@@ -19,6 +18,8 @@ const ALWAYS_EXCLUDED = [
   '[role="tooltip"]',
   '[role="alert"]',
 ].join(', ')
+
+const COMPOSER_OWNERSHIP = '[data-composer-seat], [data-composer-card]'
 
 const SIDEBAR_OR_WORKSPACE = [
   '[data-slot="sidebar"]',
@@ -51,6 +52,8 @@ export class ThemeCompatibility {
   /** Explicit opt-outs and host-owned regions. */
   isExcluded(element: HTMLElement, kind: MotionKind): boolean {
     if (element.closest(ALWAYS_EXCLUDED) !== null) return true
+    if (element.closest(COMPOSER_OWNERSHIP) !== null
+      && kind !== 'menu' && kind !== 'listbox' && kind !== 'dialog' && kind !== 'mask') return true
     if (element.matches('[data-ds-app-frame], [data-shell-overlay]')) return true
     if ((kind === 'page' || kind === 'slot')
       && element.closest(SIDEBAR_OR_WORKSPACE) !== null
