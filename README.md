@@ -1,3 +1,5 @@
+[简体中文](./README.zh-CN.md)
+
 # dsh-motion
 
 `@dsh-external/dsh-motion` is a small, zero-configuration browser plugin for
