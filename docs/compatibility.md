@@ -2,13 +2,22 @@
 
 ## Host Lines
 
-- Local source checkout: DeepSeek Harness `0.1.0-rc.5`, branch
-  `feature/angelina-themes`, commit
-  `ed90f252829c59e4949c09006d64d215afa909d4`.
-- Published type/dependency line: `@deepseek-ai/dsh-client-runtime@0.1.0-rc.6`
-  with `@deepseek-ai/cordis@4.0.1`.
-- Package peer range: runtime `>=0.1.0-rc.5 <0.2.0`, Cordis
-  `>=4.0.1 <5`.
+- Supported runtime lines: DeepSeek Harness `0.1.x` (original QA baseline
+  `0.1.0-rc.5` source checkout, `feature/angelina-themes`, commit
+  `ed90f252829c59e4949c09006d64d215afa909d4`) and `0.2.x` (current published
+  line `0.2.2-rc.5`).
+- Compatibility declaration: `engines.dsh: >=0.1.0-rc.5 <0.3.0` is checked by
+  0.2.x boot; `0.1.x` does not evaluate `engines.dsh`. The Cordis peer remains
+  `>=4.0.1 <5` and is satisfied by both `4.0.1` (0.1.x) and `~4.1.0` (0.2.x).
+- Client contract shared by both lines: `Context` from `@deepseek-ai/cordis`
+  (0.1.x re-exported it as `ClientContext`), `ctx.effect(execute, label)`,
+  `window.__ModuleLoader__.load({ id, factory })`, an empty client `inject`
+  roster, and the bundle `cordis.patch.yml` insert. `@deepseek-ai/dsh-client-runtime`
+  existed only in 0.1.x and is no longer referenced.
+- Dev typecheck line: `@deepseek-ai/cordis@4.1.0`, whose `Context`/`effect`
+  surface matches `4.0.1`. 0.2.2-rc.5 itself requires Node >=24.9; this
+  repository builds and tests on Node 22, so the 0.2.x web profile matrix has
+  not been re-run locally after the compatibility change.
 
 ## Automated Checks
 

@@ -28,7 +28,9 @@ dsh plugin --profile web add C:\path\to\dsh-motion
 
 ## 兼容性
 
-当前版本针对本地 Harness `0.1.0-rc.5` 源码和已发布的 `0.1.0-rc.6` 客户端运行时依赖进行测试。插件适配默认的 `light`/`dark` 主题和 `angelina-light`/`angelina-dark` 主题所使用的语义标记，不依赖 CSS Module 哈希类名。
+插件声明 `engines.dsh: >=0.1.0-rc.5 <0.3.0`，同时兼容 `0.1.x` 与 `0.2.x`（当前 latest `0.2.2-rc.5`）两条发布线。客户端 half 仅依赖 Cordis `Context` 与 `ctx.effect`，不依赖 `0.2.x` 中已移除的 `@deepseek-ai/dsh-client-runtime`；`dsh.client.inject` 为空数组，两条线的 boot graph 均可解析。
+
+插件适配默认的 `light`/`dark` 主题和 `angelina-light`/`angelina-dark` 主题所使用的语义标记，不依赖 CSS Module 哈希类名。宿主版本差异与验证边界见 [`docs/compatibility.md`](docs/compatibility.md)。
 
 ## 构建与测试
 

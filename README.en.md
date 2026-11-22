@@ -43,10 +43,16 @@ profile after adding it.
 
 ## Compatibility
 
-The release is tested against the Harness `0.1.0-rc.5` checkout and the
-published `0.1.0-rc.6` client-runtime line. It targets the semantic markers
-used by the default `light`/`dark` themes and by `angelina-light`/
-`angelina-dark`; it does not depend on CSS-module class hashes.
+The package declares `engines.dsh: >=0.1.0-rc.5 <0.3.0` and supports both the
+`0.1.x` and `0.2.x` (currently `0.2.2-rc.5`) release lines. Its client half
+depends only on Cordis `Context` and `ctx.effect`; it does not reference the
+`@deepseek-ai/dsh-client-runtime` package removed in `0.2.x`, and an empty
+`dsh.client.inject` roster resolves on both lines.
+
+It targets the semantic markers used by the default `light`/`dark` themes and
+by `angelina-light`/`angelina-dark`; it does not depend on CSS-module class
+hashes. See [`docs/compatibility.md`](docs/compatibility.md) for host-line
+details and verification boundaries.
 
 ## Build and test
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context } from '@deepseek-ai/cordis'
 import { apply, inject } from '../src/client/index.ts'
 
 afterEach(() => {
@@ -14,7 +14,7 @@ describe('client lifecycle adapter', () => {
       disposer = execute()
       return { dispose: async () => {} }
     })
-    apply({ effect } as unknown as ClientContext)
+    apply({ effect } as unknown as Context)
 
     expect(inject).toEqual([])
     expect(effect).toHaveBeenCalledOnce()

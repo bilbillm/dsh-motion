@@ -1,4 +1,6 @@
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+// Both dsh 0.1.x and 0.2.x expose the same Cordis Context to client plugins.
+// Using Cordis directly avoids depending on 0.1.x's removed client-runtime package.
+import type { Context } from '@deepseek-ai/cordis'
 import { MotionRuntime } from '../motion-runtime.ts'
 
 export { MotionPolicy, parseCssDuration } from '../motion-policy.ts'
@@ -13,7 +15,7 @@ export type { MotionAnimation, MotionAnimator, MotionRuntimeOptions } from '../m
 export const inject: string[] = []
 
 /** Install and dispose the browser runtime with the Cordis plugin fiber. */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   ctx.effect(() => {
     if (typeof document === 'undefined') return () => {}
     const runtime = new MotionRuntime({ root: document })
